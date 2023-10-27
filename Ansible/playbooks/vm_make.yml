@@ -1,5 +1,5 @@
 ---
-- name: Deploy VM from template
+- name: deploy VM on netlab and install apache2
   hosts: localhost
   gather_facts: false
   collections:
@@ -7,9 +7,11 @@
   pre_tasks:
     - include_vars: ../vars.yml
 
+  vars:
+      ansible_ssh_common_args: '-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
 
   tasks:
-      - name: Deploy VM from templ 
+      - name: deploy vm from template
         vmware_guest:
           hostname: "{{ vcenter_hostname }}"
           username: "{{ vcenter_username }}"
@@ -26,15 +28,10 @@
           wait_for_ip_address: yes
         register: vm_info
 
-      - name: deploy info
+      - name: deployment ip address
         debug:
-          msg: "server ip: {{ vm_info.instance.ipv4 }}"
-
-      - name: add host to known_hosts keys
-        ansible.builtin.shell: ssh-keyscan "{{ vm_info.instance.ipv4 }}" >> ~/.ssh/known_hosts
-        delegate_to: localhost
-        run_once: true
-
+          msg: "server adress: {{ vm_info.instance.ipv4 }}"
+  
       - name: apache2
         delegate_to: "student@{{ vm_info.instance.ipv4 }}"
         become: true
@@ -44,5 +41,16 @@
             state: present
         vars:
           ansible_become_pass: student
-
-
+      
+      - name: firewall changes
+        delegate_to: "student@{{ vm_info.instance.ipv4 }}"
+        become: true
+        become_method: sudo
+        ufw:
+          rule: allow
+          port: 
+            - '80'
+            - '443'
+          proto: tcp
+        vars:
+          ansible_become_pass: student
